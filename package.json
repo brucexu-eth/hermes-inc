@@ -1,0 +1,25 @@
+{
+  "name": "hermes-inc",
+  "version": "0.1.0",
+  "description": "Telegram-native AI startup simulator for Hermes Agent",
+  "type": "module",
+  "bin": {
+    "hermes-inc": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "db:init": "node dist/scripts/init-db.js",
+    "start": "node dist/cli.js",
+    "tick": "node dist/scripts/tick.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "nanoid": "^5.0.9"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}
