@@ -25,7 +25,7 @@ bash install.sh
 hermes gateway start
 ```
 
-Then send `/start` to your Hermes bot in Telegram.
+Then send `/inc_start` to your Hermes bot in Telegram.
 
 ---
 
@@ -80,7 +80,7 @@ The install script will:
 - Register game slash commands (`/start`, `/status`, `/next`, etc.) as Hermes quick_commands
 - Restart the gateway if it's running
 
-Once installed, send `/start` to your Hermes bot in Telegram to begin.
+Once installed, send `/inc_start` to your Hermes bot in Telegram to begin.
 
 ### (Optional) Enable Auto-Advance via Cron
 
@@ -108,17 +108,23 @@ For the full boardroom experience:
 
 | Command | Description |
 |---------|-------------|
-| `/start` | Start a new company |
-| `/status` | View company dashboard |
-| `/next` | Advance one week |
-| `/plan` | Get team suggestions for next week |
-| `/event` | Trigger a random event |
-| `/speed demo\|fast\|normal\|slow` | Set auto-advance speed |
-| `/pause` | Pause auto-advance |
-| `/ship <feature>` | Ship a product feature |
-| `/hire <role>` | Hire a new team member |
-| `/fire <name>` | Fire a team member |
-| `/fundraise` | Attempt to raise funding |
+| `/inc_start` | Start a new company |
+| `/inc_status` | View company dashboard |
+| `/inc_next` | Advance one week |
+| `/inc_plan` | Get team suggestions for next week |
+| `/inc_event` | Trigger a random event |
+| `/inc_pause` | Pause auto-advance |
+| `/inc_resume` | Resume auto-advance |
+| `/inc_fundraise` | Attempt to raise funding |
+
+Commands with arguments (type as natural language):
+
+| Message | What it does |
+|---------|-------------|
+| `speed demo` | Set speed (demo/fast/normal/slow) |
+| `ship Telegram Memory` | Ship a product feature |
+| `hire engineer` | Hire a new team member |
+| `fire Voss` | Fire a team member |
 
 ### Natural Language Strategy
 
@@ -138,7 +144,7 @@ The engine parses your intent, agents debate the trade-offs, and the rule engine
 | `fast` | 5 minutes = 1 week |
 | `normal` | 1 hour = 1 week |
 | `slow` | 24 hours = 1 week |
-| `manual` | Use `/next` to advance |
+| `manual` | Use `/inc_next` to advance |
 
 ---
 

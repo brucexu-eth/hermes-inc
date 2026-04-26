@@ -12,12 +12,13 @@ You are founder engineer #001.
 🎯 Goal: survive, grow, and define the future of personal agents.
 
 Type a strategy or use commands:
-/status — View company dashboard
-/next — Advance one week
-/plan — Get team suggestions
-/event — Trigger a random event
-/speed demo|fast|normal|slow — Set game speed
-/pause — Pause auto-advance`;
+/inc_status — View company dashboard
+/inc_next — Advance one week
+/inc_plan — Get team suggestions
+/inc_event — Trigger a random event
+/inc_pause — Pause auto-advance
+
+Or type naturally: "Focus on Telegram Memory, delay monetization"`;
 }
 
 export function formatStatus(state: GameState): string {
@@ -174,7 +175,7 @@ Final Stats:
 ⭐ Stars: ${num(state.github_stars)}
 💎 Final Valuation: $${formatValuation(state.valuation)}
 
-Type /start to begin a new game.`;
+Type /inc_start to begin a new game.`;
 }
 
 export function formatSpeedChange(mode: string, interval: number): string {

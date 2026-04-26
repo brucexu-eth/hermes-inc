@@ -86,17 +86,21 @@ if os.path.exists(config_path):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f) or {}
 
-# Commands to register
+# Commands to register — prefixed with inc_ to avoid conflicts with Hermes builtins
 commands = {
-    "start":     f"cd {project_dir} && node dist/cli.js start",
-    "status":    f"cd {project_dir} && node dist/cli.js status",
-    "next":      f"cd {project_dir} && node dist/cli.js next",
-    "plan":      f"cd {project_dir} && node dist/cli.js plan",
-    "event":     f"cd {project_dir} && node dist/cli.js event",
-    "pause":     f"cd {project_dir} && node dist/cli.js pause",
-    "resume":    f"cd {project_dir} && node dist/cli.js resume",
-    "fundraise": f"cd {project_dir} && node dist/cli.js fundraise",
+    "inc_start":     f"cd {project_dir} && node dist/cli.js start",
+    "inc_status":    f"cd {project_dir} && node dist/cli.js status",
+    "inc_next":      f"cd {project_dir} && node dist/cli.js next",
+    "inc_plan":      f"cd {project_dir} && node dist/cli.js plan",
+    "inc_event":     f"cd {project_dir} && node dist/cli.js event",
+    "inc_pause":     f"cd {project_dir} && node dist/cli.js pause",
+    "inc_resume":    f"cd {project_dir} && node dist/cli.js resume",
+    "inc_fundraise": f"cd {project_dir} && node dist/cli.js fundraise",
 }
+
+# Clean up old unprefixed commands if they exist
+for old_name in ["start", "status", "next", "plan", "event", "pause", "resume", "fundraise"]:
+    config.get("quick_commands", {}).pop(old_name, None)
 
 # Ensure quick_commands exists as a dict
 if not isinstance(config.get("quick_commands"), dict):
@@ -113,7 +117,7 @@ with open(config_path, "w") as f:
     yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 PYEOF
 
-echo "  ✅ Quick commands registered (start, status, next, plan, event, pause, resume, fundraise)"
+echo "  ✅ Quick commands registered (inc_start, inc_status, inc_next, inc_plan, inc_event, inc_pause, inc_resume, inc_fundraise)"
 
 # 9. Restart gateway if running
 if [ -f "$HERMES_HOME/gateway.pid" ]; then
@@ -126,13 +130,14 @@ echo ""
 echo "✅ Hermes Inc. installed successfully!"
 echo ""
 echo "🎮 How to play:"
-echo "  In Telegram, send /start to your Hermes bot."
+echo "  In Telegram, send /inc_start to your Hermes bot."
 echo ""
-echo "  Game commands:  /start /status /next /plan /event /pause /fundraise"
+echo "  Game commands:"
+echo "    /inc_start  /inc_status  /inc_next  /inc_plan"
+echo "    /inc_event  /inc_pause   /inc_resume /inc_fundraise"
+echo ""
 echo "  Natural language: just type your strategy, e.g. 'Focus on Telegram Memory'"
-echo ""
-echo "  For commands with arguments (ship, hire, fire, speed),"
-echo "  type naturally: 'ship Telegram Memory' or 'hire engineer'"
+echo "  For ship/hire/fire/speed, type naturally: 'ship Telegram Memory' or 'hire engineer'"
 echo ""
 echo "To enable auto-advance (cron):"
 echo "  hermes cron create \"every 1m\" \\"
