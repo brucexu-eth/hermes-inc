@@ -75,16 +75,16 @@ echo "⚡ Registering game commands..."
 CONFIG_FILE="$HERMES_HOME/config.yaml"
 
 python3 - "$CONFIG_FILE" "$SCRIPT_DIR" <<'PYEOF'
-import sys, os
+import sys, os, yaml
 
 config_path = sys.argv[1]
 project_dir = sys.argv[2]
 
-# Read existing config
-content = ""
+# Load existing config
+config = {}
 if os.path.exists(config_path):
     with open(config_path, "r") as f:
-        content = f.read()
+        config = yaml.safe_load(f) or {}
 
 # Commands to register
 commands = {
@@ -98,19 +98,19 @@ commands = {
     "fundraise": f"cd {project_dir} && node dist/cli.js fundraise",
 }
 
-# Check if quick_commands section exists
-if "quick_commands:" not in content:
-    content += "\nquick_commands:\n"
+# Ensure quick_commands exists as a dict
+if not isinstance(config.get("quick_commands"), dict):
+    config["quick_commands"] = {}
 
-# Append each command if not already present
+# Write each command
 for name, cmd in commands.items():
-    if f"  {name}:" not in content:
-        content += f"  {name}:\n"
-        content += f"    type: exec\n"
-        content += f"    command: \"{cmd}\"\n"
+    config["quick_commands"][name] = {
+        "type": "exec",
+        "command": cmd,
+    }
 
 with open(config_path, "w") as f:
-    f.write(content)
+    yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 PYEOF
 
 echo "  ✅ Quick commands registered (start, status, next, plan, event, pause, resume, fundraise)"
