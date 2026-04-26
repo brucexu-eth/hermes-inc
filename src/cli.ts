@@ -99,6 +99,9 @@ async function main() {
     case 'choose':
       cmdChoose(rest);
       break;
+    case 'chatter':
+      cmdChatter();
+      break;
     default:
       if (command && !command.startsWith('-')) {
         // Treat as natural language decision
@@ -604,6 +607,117 @@ function cmdTick() {
     const next = new Date(Date.now() + interval * 60 * 1000).toISOString();
     updateGameState({ next_tick_at: next } as any);
   }
+}
+
+function cmdChatter() {
+  const state = getGameState();
+  if (!state || state.game_over || state.paused) {
+    console.log('[SILENT]');
+    return;
+  }
+
+  // Determine if there's something worth chattering about
+  // Each trigger has a base probability; multiple triggers stack
+  const triggers: { agent: string; emoji: string; message: string; prob: number }[] = [];
+
+  // Runway crisis
+  if (state.runway_weeks < 4) {
+    triggers.push(
+      { agent: 'Voss', emoji: '💰', message: `Runway is ${state.runway_weeks.toFixed(1)} weeks. We need to talk about revenue. Now.`, prob: 0.6 },
+      { agent: 'Stella', emoji: '🧠', message: `If we die before shipping the next feature, none of this matters. Can we cut something?`, prob: 0.3 },
+    );
+  } else if (state.runway_weeks < 8) {
+    triggers.push(
+      { agent: 'Voss', emoji: '💰', message: `Runway is tightening. ${state.runway_weeks.toFixed(1)} weeks left. We should consider monetization.`, prob: 0.25 },
+    );
+  }
+
+  // Tech debt warning
+  if (state.tech_debt > 60) {
+    triggers.push(
+      { agent: 'Linus', emoji: '🛠', message: `Tech debt is at ${Math.round(state.tech_debt)}. Every new feature is slower to ship. We need a refactoring sprint.`, prob: 0.35 },
+    );
+  }
+
+  // Security risk
+  if (state.security_risk > 50) {
+    triggers.push(
+      { agent: 'Nyx', emoji: '🛡', message: `Security risk is at ${Math.round(state.security_risk)}. One breach and we lose everything we've built.`, prob: 0.4 },
+    );
+  }
+
+  // Community trust erosion
+  if (state.community_trust < 40) {
+    triggers.push(
+      { agent: 'Maya', emoji: '🌱', message: `Community trust is at ${Math.round(state.community_trust)}. I'm seeing fork discussions on GitHub. We need to act.`, prob: 0.4 },
+    );
+  }
+
+  // Low morale
+  if (state.team_morale < 40) {
+    triggers.push(
+      { agent: 'Stella', emoji: '🧠', message: `Team morale is ${Math.round(state.team_morale)}. People are burning out. Maybe we should slow down.`, prob: 0.35 },
+      { agent: 'Linus', emoji: '🛠', message: `I've been working 14-hour days for three weeks. Something has to give.`, prob: 0.2 },
+    );
+  }
+
+  // Hype momentum
+  if (state.hype > 50) {
+    triggers.push(
+      { agent: 'Stella', emoji: '🧠', message: `Hype is high right now. This is the window to ship something big or it fades.`, prob: 0.25 },
+      { agent: 'Voss', emoji: '💰', message: `Investor interest is up. If we're going to fundraise, this is the moment.`, prob: 0.2 },
+    );
+  }
+
+  // Stars milestone approaching
+  if (state.github_stars > 8000 && state.github_stars < 11000) {
+    triggers.push(
+      { agent: 'Maya', emoji: '🌱', message: `We're close to 10k stars. One more push and we cross a major milestone.`, prob: 0.3 },
+    );
+  }
+
+  // Good state — agents relax or brainstorm
+  if (state.runway_weeks > 12 && state.team_morale > 60 && state.tech_debt < 40) {
+    triggers.push(
+      { agent: 'Linus', emoji: '🛠', message: `Things are stable. Good time to invest in architecture or try something experimental.`, prob: 0.15 },
+      { agent: 'Maya', emoji: '🌱', message: `Community is healthy. Maybe we should host a contributor sprint this week?`, prob: 0.15 },
+      { agent: 'Voss', emoji: '💰', message: `Numbers look decent. Should we start thinking about the next funding round?`, prob: 0.1 },
+    );
+  }
+
+  // Agent disagreements / tensions
+  if (state.mrr > 0 && state.community_trust < 60) {
+    triggers.push(
+      { agent: 'Maya', emoji: '🌱', message: `Voss, every dollar of MRR you celebrate costs us community trust. Is it worth it?`, prob: 0.2 },
+      { agent: 'Voss', emoji: '💰', message: `Maya, community trust doesn't pay salaries. We have ${state.runway_weeks.toFixed(0)} weeks of runway.`, prob: 0.2 },
+    );
+  }
+
+  // No users growing
+  if (state.users > 500 && state.hype < 15) {
+    triggers.push(
+      { agent: 'Stella', emoji: '🧠', message: `Growth has stalled. Hype is at ${Math.round(state.hype)}. We need a demo moment or a marketing push.`, prob: 0.25 },
+    );
+  }
+
+  // Nothing interesting — stay silent most of the time
+  if (triggers.length === 0) {
+    console.log('[SILENT]');
+    return;
+  }
+
+  // Pick one trigger based on probability
+  // Shuffle and try each
+  const shuffled = triggers.sort(() => Math.random() - 0.5);
+  for (const t of shuffled) {
+    if (Math.random() < t.prob) {
+      console.log(`${t.emoji} ${t.agent}:\n${t.message}`);
+      return;
+    }
+  }
+
+  // All rolls failed — stay silent
+  console.log('[SILENT]');
 }
 
 function printHelp() {

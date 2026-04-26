@@ -96,6 +96,7 @@ commands = {
     "inc_pause":     f"cd {project_dir} && node dist/cli.js pause",
     "inc_resume":    f"cd {project_dir} && node dist/cli.js resume",
     "inc_fundraise": f"cd {project_dir} && node dist/cli.js fundraise",
+    "inc_chatter":   f"cd {project_dir} && node dist/cli.js chatter",
 }
 
 # Clean up old unprefixed commands if they exist
@@ -117,7 +118,7 @@ with open(config_path, "w") as f:
     yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 PYEOF
 
-echo "  ✅ Quick commands registered (inc_start, inc_status, inc_next, inc_plan, inc_event, inc_pause, inc_resume, inc_fundraise)"
+echo "  ✅ Quick commands registered"
 
 # 9. Restart gateway if running
 if [ -f "$HERMES_HOME/gateway.pid" ]; then
@@ -139,7 +140,14 @@ echo ""
 echo "  Natural language: just type your strategy, e.g. 'Focus on Telegram Memory'"
 echo "  For ship/hire/fire/speed, type naturally: 'ship Telegram Memory' or 'hire engineer'"
 echo ""
-echo "To enable auto-advance (cron):"
-echo "  hermes cron create \"every 1m\" \\"
-echo "    \"Run: cd $SCRIPT_DIR && node dist/cli.js tick — If output is [SILENT], do nothing. Otherwise post the output.\" \\"
-echo "    --skill hermes-inc --name \"Hermes Inc Tick\""
+echo "To enable automation (recommended):"
+echo ""
+echo "  1. Auto-advance weeks (set speed first with /inc_speed):"
+echo "     hermes cron create \"every 1m\" \\"
+echo "       \"Run: cd $SCRIPT_DIR && node dist/cli.js tick — If output contains [SILENT], do nothing and do not reply. Otherwise post the output to the chat.\" \\"
+echo "       --name \"Hermes Inc Tick\""
+echo ""
+echo "  2. Agent chatter (agents talk between weeks):"
+echo "     hermes cron create \"every 3m\" \\"
+echo "       \"Run: cd $SCRIPT_DIR && node dist/cli.js chatter — If output contains [SILENT], do nothing and do not reply. Otherwise post the output to the chat as if you are that agent character.\" \\"
+echo "       --name \"Hermes Inc Chatter\""
