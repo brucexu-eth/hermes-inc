@@ -77,6 +77,8 @@ The install script will:
 - Initialize the SQLite database
 - Install the `hermes-inc` skill into your current Hermes profile (`~/.hermes/skills/hermes-inc/`)
 - Append the Game Master personality to your existing `SOUL.md`
+- Register game slash commands (`/start`, `/status`, `/next`, etc.) as Hermes quick_commands
+- Restart the gateway if it's running
 
 Once installed, send `/start` to your Hermes bot in Telegram to begin.
 
