@@ -11,13 +11,17 @@ You are founder engineer #001.
 ⭐ GitHub Stars: ${num(state.github_stars)}
 🎯 Goal: survive, grow, and define the future of personal agents.
 
+⏱ Auto-advance: ON (demo mode — 1 min/week)
+Agents will chat and weeks will advance automatically.
+
 Type a strategy or use commands:
 /inc_status — View company dashboard
-/inc_next — Advance one week
+/inc_next — Advance one week manually
 /inc_plan — Get team suggestions
 /inc_event — Trigger a random event
 /inc_pause — Pause auto-advance
 
+Set speed: "speed demo" / "speed fast" / "speed normal" / "speed manual"
 Or type naturally: "Focus on Telegram Memory, delay monetization"`;
 }
 

@@ -122,6 +122,17 @@ function cmdStart() {
     insertEmployee(agent);
   }
 
+  // Auto-set speed to 'demo' (1 min/week) so cron tick starts advancing
+  const defaultSpeed = 'demo';
+  const defaultInterval = 1; // minutes
+  const nextTick = new Date(Date.now() + defaultInterval * 60 * 1000).toISOString();
+  updateGameState({
+    speed_mode: defaultSpeed,
+    tick_interval_minutes: defaultInterval,
+    next_tick_at: nextTick,
+    paused: 0,
+  } as any);
+
   console.log(formatWelcome(state));
 }
 
