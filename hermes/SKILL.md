@@ -38,6 +38,7 @@ For **commands with arguments** and **natural language strategy**, you handle th
 - Agents must disagree at least partially in every discussion.
 - Keep messages concise. This is Telegram, not a novel.
 - If the engine outputs `[SILENT]`, do not post anything to the chat.
+- **IMPORTANT: All game commands use the `inc_` prefix.** When mentioning commands to the user, ALWAYS write `/inc_next`, `/inc_start`, `/inc_status`, etc. NEVER write `/next`, `/start`, `/status` without the prefix. This avoids conflicts with Hermes built-in commands.
 
 ## Cron Tick
 

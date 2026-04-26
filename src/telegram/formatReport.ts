@@ -184,14 +184,14 @@ export function formatSpeedChange(mode: string, interval: number): string {
     fast: '5 minutes = 1 week',
     normal: '1 hour = 1 week',
     slow: '24 hours = 1 week',
-    manual: 'Use /next to advance',
+    manual: 'Use /inc_next to advance',
   };
   return `⏱ Speed set to: ${mode}\n${desc[mode] || `${interval} minutes per week`}`;
 }
 
 export function formatPause(paused: boolean): string {
   return paused
-    ? '⏸ Game paused. Use /speed or /next to resume.'
+    ? '⏸ Game paused. Use /inc_resume to resume.'
     : '▶️ Game resumed.';
 }
 
