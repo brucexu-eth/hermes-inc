@@ -10,6 +10,28 @@ Survive. Grow. Define the future of personal agents.
 
 ---
 
+## Quick Start
+
+```bash
+# Install Hermes Agent (if not already installed)
+curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
+
+# Clone and install
+git clone https://github.com/user/hermes-inc
+cd hermes-inc
+bash install.sh
+
+# Configure Telegram credentials
+nano ~/.hermes/profiles/hermesinc/.env
+
+# Launch
+hermes -p hermesinc gateway start
+```
+
+Then send `/start` to your bot in Telegram.
+
+---
+
 ## Demo
 
 ```
@@ -40,25 +62,14 @@ Runway: 11.3 weeks → 9.8 weeks
 
 ## Installation
 
-### Option A: CLI Only (no Hermes Agent)
+### Prerequisites
 
-Play directly in your terminal. No Telegram, no LLM provider needed.
+- A VPS or local machine with **Node.js 20+**
+- A [Hermes Agent](https://hermes-agent.nousresearch.com/) instance
+- A Telegram bot token from [@BotFather](https://t.me/BotFather)
+- An LLM provider API key (OpenRouter, Anthropic, OpenAI, etc.)
 
-```bash
-git clone https://github.com/user/hermes-inc
-cd hermes-inc
-npm install
-npm run build
-mkdir -p data && npm run db:init
-npm link                          # makes `hermes-inc` available globally
-hermes-inc start
-```
-
-### Option B: Full Setup with Hermes Agent + Telegram
-
-Turn a Telegram group into your AI startup boardroom.
-
-#### 1. Install Hermes Agent
+### 1. Install Hermes Agent
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
@@ -66,7 +77,7 @@ source ~/.zshrc    # or source ~/.bashrc
 hermes doctor      # verify installation
 ```
 
-#### 2. Configure an LLM Provider
+### 2. Configure an LLM Provider
 
 ```bash
 hermes model       # interactive setup — pick OpenRouter, Anthropic, OpenAI, etc.
@@ -74,14 +85,14 @@ hermes model       # interactive setup — pick OpenRouter, Anthropic, OpenAI, e
 
 The model must support **64K+ context tokens** for multi-step tool-calling workflows.
 
-#### 3. Create a Telegram Bot
+### 3. Create a Telegram Bot
 
 1. Open Telegram and message [@BotFather](https://t.me/BotFather).
 2. Send `/newbot`, follow the prompts, and copy the **bot token**.
 3. Send `/setprivacy` → select your bot → **Disable** (so the bot can read group messages).
 4. Message [@userinfobot](https://t.me/userinfobot) to get your **numeric Telegram user ID**.
 
-#### 4. Install Hermes Inc.
+### 4. Install Hermes Inc.
 
 ```bash
 git clone https://github.com/user/hermes-inc
@@ -96,7 +107,7 @@ The install script will:
 - Copy `SOUL.md` (game master personality) and `SKILL.md` (command mapping)
 - Set the working directory for the profile
 
-#### 5. Configure Telegram Credentials
+### 5. Configure Telegram Credentials
 
 ```bash
 nano ~/.hermes/profiles/hermesinc/.env
@@ -111,7 +122,7 @@ TELEGRAM_ALLOWED_USERS=your_numeric_user_id
 
 Replace with your actual values.
 
-#### 6. Start the Telegram Gateway
+### 6. Start the Telegram Gateway
 
 ```bash
 hermes -p hermesinc gateway setup
@@ -120,7 +131,7 @@ hermes -p hermesinc gateway start
 
 Your bot is now live. Send `/start` in a Telegram chat with the bot to begin.
 
-#### 7. (Optional) Enable Auto-Advance via Cron
+### 7. (Optional) Enable Auto-Advance via Cron
 
 Set up a cron job so the game advances automatically without typing `/next`:
 
@@ -130,7 +141,7 @@ hermes -p hermesinc cron create "every 1m" \
   --skill hermes-inc --name "Hermes Inc Tick"
 ```
 
-#### 8. (Optional) Create a Telegram Group
+### 8. (Optional) Create a Telegram Group
 
 For the full boardroom experience:
 
