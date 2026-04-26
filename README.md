@@ -16,19 +16,16 @@ Survive. Grow. Define the future of personal agents.
 # Install Hermes Agent (if not already installed)
 curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 
-# Clone and install
+# Clone and install — skill is added to your current Hermes profile
 git clone https://github.com/user/hermes-inc
 cd hermes-inc
 bash install.sh
 
-# Configure Telegram credentials
-nano ~/.hermes/profiles/hermesinc/.env
-
-# Launch
-hermes -p hermesinc gateway start
+# Start the gateway (if not already running)
+hermes gateway start
 ```
 
-Then send `/start` to your bot in Telegram.
+Then send `/start` to your Hermes bot in Telegram.
 
 ---
 
@@ -64,35 +61,10 @@ Runway: 11.3 weeks → 9.8 weeks
 
 ### Prerequisites
 
-- A VPS or local machine with **Node.js 20+**
-- A [Hermes Agent](https://hermes-agent.nousresearch.com/) instance
-- A Telegram bot token from [@BotFather](https://t.me/BotFather)
-- An LLM provider API key (OpenRouter, Anthropic, OpenAI, etc.)
+- A working [Hermes Agent](https://hermes-agent.nousresearch.com/) instance with Telegram already configured
+- **Node.js 20+** on the same machine
 
-### 1. Install Hermes Agent
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
-source ~/.zshrc    # or source ~/.bashrc
-hermes doctor      # verify installation
-```
-
-### 2. Configure an LLM Provider
-
-```bash
-hermes model       # interactive setup — pick OpenRouter, Anthropic, OpenAI, etc.
-```
-
-The model must support **64K+ context tokens** for multi-step tool-calling workflows.
-
-### 3. Create a Telegram Bot
-
-1. Open Telegram and message [@BotFather](https://t.me/BotFather).
-2. Send `/newbot`, follow the prompts, and copy the **bot token**.
-3. Send `/setprivacy` → select your bot → **Disable** (so the bot can read group messages).
-4. Message [@userinfobot](https://t.me/userinfobot) to get your **numeric Telegram user ID**.
-
-### 4. Install Hermes Inc.
+### Install
 
 ```bash
 git clone https://github.com/user/hermes-inc
@@ -103,51 +75,28 @@ bash install.sh
 The install script will:
 - Install Node.js dependencies and build the project
 - Initialize the SQLite database
-- Detect Hermes Agent and create a `hermesinc` profile
-- Copy `SOUL.md` (game master personality) and `SKILL.md` (command mapping)
-- Set the working directory for the profile
+- Install the `hermes-inc` skill into your current Hermes profile (`~/.hermes/skills/hermes-inc/`)
+- Append the Game Master personality to your existing `SOUL.md`
 
-### 5. Configure Telegram Credentials
+Once installed, send `/start` to your Hermes bot in Telegram to begin.
 
-```bash
-nano ~/.hermes/profiles/hermesinc/.env
-```
-
-Add:
-
-```env
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
-TELEGRAM_ALLOWED_USERS=your_numeric_user_id
-```
-
-Replace with your actual values.
-
-### 6. Start the Telegram Gateway
-
-```bash
-hermes -p hermesinc gateway setup
-hermes -p hermesinc gateway start
-```
-
-Your bot is now live. Send `/start` in a Telegram chat with the bot to begin.
-
-### 7. (Optional) Enable Auto-Advance via Cron
+### (Optional) Enable Auto-Advance via Cron
 
 Set up a cron job so the game advances automatically without typing `/next`:
 
 ```bash
-hermes -p hermesinc cron create "every 1m" \
+hermes cron create "every 1m" \
   "Run hermes-inc tick in the terminal. If output is [SILENT], do nothing. Otherwise post the output." \
   --skill hermes-inc --name "Hermes Inc Tick"
 ```
 
-### 8. (Optional) Create a Telegram Group
+### (Optional) Create a Telegram Group
 
 For the full boardroom experience:
 
 1. Create a Telegram group named **"Hermes Inc. Board Room"**.
-2. Add your bot to the group and **promote it to admin**.
-3. Set `TELEGRAM_HOME_CHANNEL` in the profile `.env` to the group chat ID.
+2. Add your Hermes bot to the group and **promote it to admin**.
+3. Set `TELEGRAM_HOME_CHANNEL` in `~/.hermes/.env` to the group chat ID.
 
 ---
 
@@ -291,7 +240,7 @@ Telegram Group
   ↓
 Hermes Telegram Gateway
   ↓
-Hermes Profile (hermesinc)
+Hermes Agent (your existing profile)
   ↓
 SOUL.md + SKILL.md (Game Master prompt)
   ↓
