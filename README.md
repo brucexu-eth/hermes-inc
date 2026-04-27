@@ -8,6 +8,8 @@ Survive. Grow. Define the future of personal agents.
 
 > **It does not predict startup outcomes. It makes strategic trade-offs visible and playable.**
 
+Demo: <https://x.com/brucexu_eth/status/2048625942416023874>
+
 ---
 
 ## Quick Start
