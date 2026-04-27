@@ -6,10 +6,12 @@ import {
   initDb, getGameState, createGameState, updateGameState, resetGame,
   getActiveEmployees, insertEmployee, updateEmployee, getEmployee,
   insertDecision, insertEvent, insertWeekLog, getDbPath, getDb,
+  getUnappliedDecisions, markDecisionsApplied,
+  MAX_ACTIONS_PER_WEEK,
 } from './db/database.js';
 import { INITIAL_AGENTS, getAgentReactions } from './data/agents.js';
 import { advanceWeek } from './engine/advanceWeek.js';
-import { parseNaturalLanguageDecision, applyEventEffects } from './engine/applyDecision.js';
+import { parseNaturalLanguageDecision, mergeDecisions, applyEventEffects } from './engine/applyDecision.js';
 import { EVENT_TEMPLATES, rollRandomEvent } from './data/events.js';
 import { calculateProductEffects, parseShipCommand } from './data/products.js';
 import {
@@ -17,7 +19,11 @@ import {
   formatDecisionPrompt, formatEnding, formatSpeedChange, formatPause,
   formatPlan, formatEventChoices,
 } from './telegram/formatReport.js';
-import type { ParsedDecision, GameEvent, EventEffect } from './db/types.js';
+import {
+  gameStartPrompt, fundraisePrompt, DRAMATIC_EVENT_IDS, eventImagePrompt,
+} from './data/imagePrompts.js';
+import { generateSubTickContent } from './data/subTickContent.js';
+import type { ParsedDecision, GameEvent, EventEffect, GameState } from './db/types.js';
 import { nanoid } from 'nanoid';
 
 const args = process.argv.slice(2);
@@ -48,6 +54,30 @@ function ensureGame() {
     process.exit(1);
   }
   return state;
+}
+
+/** Check and consume one action point. Returns false and prints warning if none left. */
+function useAction(state: GameState): boolean {
+  if (state.actions_remaining <= 0) {
+    console.log(`⛔ No actions remaining this week (${MAX_ACTIONS_PER_WEEK} per week).`);
+    console.log(`Use "/inc_next" to advance to next week and get fresh action points.`);
+    return false;
+  }
+  state.actions_remaining -= 1;
+  updateGameState({ actions_remaining: state.actions_remaining } as any);
+  return true;
+}
+
+function printActionsRemaining(state: GameState) {
+  console.log(`\n🎬 Actions remaining this week: ${state.actions_remaining}/${MAX_ACTIONS_PER_WEEK}`);
+}
+
+/** Check if AP is exhausted and auto-advance if so */
+function checkAutoAdvance(state: GameState) {
+  if (state.actions_remaining <= 0 && state.speed_mode !== 'manual') {
+    console.log('\n⏰ All action points spent — advancing to next week...\n');
+    cmdWeekAdvance();
+  }
 }
 
 async function main() {
@@ -102,10 +132,13 @@ async function main() {
     case 'chatter':
       cmdChatter();
       break;
+    case 'reply':
+      cmdReply(rest);
+      break;
     default:
       if (command && !command.startsWith('-')) {
-        // Treat as natural language decision
-        cmdDecide(args.join(' '));
+        // Treat as natural language directive
+        cmdReply(args.join(' '));
       } else {
         printHelp();
       }
@@ -122,18 +155,21 @@ function cmdStart() {
     insertEmployee(agent);
   }
 
-  // Auto-set speed to 'demo' (1 min/week) so cron tick starts advancing
-  const defaultSpeed = 'demo';
-  const defaultInterval = 1; // minutes
-  const nextTick = new Date(Date.now() + defaultInterval * 60 * 1000).toISOString();
+  // Auto-set speed to 'fast' (5 sub-ticks/week, 1 min per sub-tick = 5 min/week)
+  const defaultSpeed = 'fast';
+  const subTicksPerWeek = 5;
+  const nextTick = new Date(Date.now() + 1 * 60 * 1000).toISOString();
   updateGameState({
     speed_mode: defaultSpeed,
-    tick_interval_minutes: defaultInterval,
+    tick_interval_minutes: 1,
     next_tick_at: nextTick,
+    sub_tick: 0,
+    sub_ticks_per_week: subTicksPerWeek,
     paused: 0,
   } as any);
 
   console.log(formatWelcome(state));
+  console.log(`[IMAGE: ${gameStartPrompt()}]`);
 }
 
 function cmdStatus() {
@@ -148,28 +184,45 @@ function cmdStatus() {
       console.log(`  ${e.emoji} ${e.name} (${e.role}) — $${e.salary_per_week}/wk — Morale: ${Math.round(e.morale)}`);
     }
   }
+  printActionsRemaining(state);
 }
 
 function cmdNext(strategy?: string) {
   const state = ensureGame();
 
-  let decision: ParsedDecision | undefined;
+  // If strategy provided, add it as a pending decision
   if (strategy && strategy.trim()) {
-    decision = parseNaturalLanguageDecision(strategy);
-
-    // Log the decision
+    const decision = parseNaturalLanguageDecision(strategy);
     insertDecision({
       id: nanoid(),
       week: state.week,
       raw_input: strategy,
       parsed_json: JSON.stringify(decision),
       result_json: null,
-      applied: 1,
+      applied: 0,
       created_at: new Date().toISOString(),
     });
   }
 
+  cmdWeekAdvance();
+}
+
+function cmdWeekAdvance() {
+  const state = ensureGame();
+
+  // Gather and merge unapplied decisions for this week
+  const unapplied = getUnappliedDecisions(state.week);
+  let decision: ParsedDecision | undefined;
+  if (unapplied.length > 0) {
+    const rawInputs = unapplied.map(d => d.raw_input);
+    decision = mergeDecisions(rawInputs);
+    markDecisionsApplied(state.week);
+  }
+
   const result = advanceWeek(state, decision);
+
+  // Reset sub_tick for new week
+  result.newState.sub_tick = 0;
 
   // Save events
   for (const event of result.events) {
@@ -191,14 +244,16 @@ function cmdNext(strategy?: string) {
   updateGameState(result.newState);
 
   // Output
-  if (decision && strategy) {
+  if (decision && unapplied.length > 0) {
     const opinions = getAgentReactions(decision.focus, decision.deprioritize);
-    console.log(`📅 Week ${result.newState.week} Decision: ${strategy}\n`);
+    const summary = unapplied.map(d => d.raw_input).join(' + ');
+    console.log(`📅 Week ${result.newState.week} Directives: ${summary}\n`);
     console.log(formatAgentDebate(opinions));
     console.log('---\n');
   }
 
   console.log(formatWeeklyReport(result.prevState, result.newState, result.decisionChanges, result.events));
+  printActionsRemaining(result.newState);
 
   // Show event choices if any
   for (const event of result.events) {
@@ -211,6 +266,11 @@ function cmdNext(strategy?: string) {
   // Check ending
   if (result.ending) {
     console.log('\n' + formatEnding(result.ending, result.newState));
+  }
+
+  // Output image markers for dramatic moments
+  for (const prompt of result.imagePrompts) {
+    console.log(`[IMAGE: ${prompt}]`);
   }
 }
 
@@ -264,6 +324,7 @@ function cmdPlan() {
 
 function cmdEvent(eventId?: string) {
   const state = ensureGame();
+  if (!useAction(state)) return;
 
   let template;
   if (eventId && eventId.trim()) {
@@ -301,6 +362,12 @@ function cmdEvent(eventId?: string) {
   console.log(template.description);
   console.log('');
 
+  // Image marker for dramatic events
+  if (DRAMATIC_EVENT_IDS.has(template.id)) {
+    const imgPrompt = eventImagePrompt(template.id, state);
+    if (imgPrompt) console.log(`[IMAGE: ${imgPrompt}]`);
+  }
+
   if (hasChoices) {
     console.log('Choices:');
     for (const choice of template.choices!) {
@@ -320,10 +387,12 @@ function cmdEvent(eventId?: string) {
       console.log(`  ${sign}${value} ${label}`);
     }
   }
+  checkAutoAdvance(state);
 }
 
 function cmdChoose(input: string) {
   const state = ensureGame();
+  if (!useAction(state)) return;
   const parts = input.trim().split(/\s+/);
   const eventId = parts[0];
   const choiceId = parts.slice(1).join(' ');
@@ -371,36 +440,43 @@ function cmdChoose(input: string) {
     const label = key.replace(/_/g, ' ');
     console.log(`  ${sign}${value} ${label}`);
   }
+  printActionsRemaining(state);
+  checkAutoAdvance(state);
 }
 
 function cmdSpeed(mode: string) {
   const state = ensureGame();
-  const modes: Record<string, number> = {
-    demo: 1,
-    fast: 5,
-    normal: 60,
-    slow: 1440,
-    manual: 0,
+  const modes: Record<string, { subTicks: number }> = {
+    demo:   { subTicks: 2 },
+    fast:   { subTicks: 5 },
+    normal: { subTicks: 12 },
+    slow:   { subTicks: 60 },
+    manual: { subTicks: 0 },
   };
 
-  const interval = modes[mode];
-  if (interval === undefined) {
+  const config = modes[mode];
+  if (!config) {
     console.log('Usage: hermes-inc speed <demo|fast|normal|slow|manual>');
     return;
   }
 
-  const nextTick = interval > 0
-    ? new Date(Date.now() + interval * 60 * 1000).toISOString()
-    : null;
+  const isManual = mode === 'manual';
+  const nextTick = isManual
+    ? null
+    : new Date(Date.now() + 1 * 60 * 1000).toISOString();
 
   updateGameState({
     speed_mode: mode,
-    tick_interval_minutes: interval,
+    tick_interval_minutes: isManual ? 0 : 1,
+    sub_ticks_per_week: config.subTicks,
+    sub_tick: 0,
     next_tick_at: nextTick,
     paused: 0,
   } as any);
 
-  console.log(formatSpeedChange(mode, interval));
+  // Show real time per week
+  const realTime = isManual ? 'manual only' : `${config.subTicks} min`;
+  console.log(formatSpeedChange(mode, config.subTicks));
 }
 
 function cmdPause() {
@@ -428,6 +504,7 @@ function cmdShip(feature: string) {
   }
 
   const state = ensureGame();
+  if (!useAction(state)) return;
   const parsed = parseShipCommand(feature);
   if (!parsed) {
     console.log('Could not parse feature. Try: hermes-inc ship "Telegram Memory for developers"');
@@ -461,6 +538,8 @@ function cmdShip(feature: string) {
     const label = key.replace(/_/g, ' ');
     console.log(`  ${sign}${value} ${label}`);
   }
+  printActionsRemaining(state);
+  checkAutoAdvance(state);
 }
 
 function cmdHire(role: string) {
@@ -471,6 +550,7 @@ function cmdHire(role: string) {
   }
 
   const state = ensureGame();
+  if (!useAction(state)) return;
   const roleMap: Record<string, Partial<typeof INITIAL_AGENTS[0]>> = {
     engineer: { role: 'Engineer', emoji: '🛠', salary_per_week: 1200, personality: 'New hire. Eager but needs onboarding.' },
     pm: { role: 'PM', emoji: '🧠', salary_per_week: 900, personality: 'New product manager. Fresh perspectives.' },
@@ -513,6 +593,8 @@ function cmdHire(role: string) {
   console.log(`✅ Hired: ${template.emoji} ${name} (${template.role})`);
   console.log(`  Salary: $${template.salary_per_week}/week`);
   console.log(`  Weekly burn is now: $${Math.round(state.weekly_burn)}`);
+  printActionsRemaining(state);
+  checkAutoAdvance(state);
 }
 
 function cmdFire(nameOrRole: string) {
@@ -522,6 +604,7 @@ function cmdFire(nameOrRole: string) {
   }
 
   const state = ensureGame();
+  if (!useAction(state)) return;
   const employees = getActiveEmployees();
   const lower = nameOrRole.toLowerCase();
   const target = employees.find(e =>
@@ -545,10 +628,13 @@ function cmdFire(nameOrRole: string) {
   console.log(`  Saved: $${target.salary_per_week}/week`);
   console.log(`  ⚠️ Team morale dropped.`);
   console.log(`  Weekly burn is now: $${Math.round(state.weekly_burn)}`);
+  printActionsRemaining(state);
+  checkAutoAdvance(state);
 }
 
 function cmdFundraise() {
   const state = ensureGame();
+  if (!useAction(state)) return;
 
   // Success probability based on investor interest, traction, hype
   const baseProb = state.investor_interest / 100;
@@ -586,10 +672,91 @@ function cmdFundraise() {
     console.log(`Probability was: ${(probability * 100).toFixed(0)}%`);
     console.log(`\nTip: Increase investor_interest, users, and hype to improve odds.`);
   }
+
+  printActionsRemaining(state);
+  console.log(`[IMAGE: ${fundraisePrompt(success, state)}]`);
+  checkAutoAdvance(state);
+}
+
+function cmdReply(message: string) {
+  if (!message.trim()) {
+    console.log('Usage: hermes-inc reply <your message>');
+    console.log('Example: hermes-inc reply "Focus on security and reduce tech debt"');
+    return;
+  }
+
+  const state = ensureGame();
+  if (!useAction(state)) return;
+
+  // Parse and show agent debate as immediate feedback
+  const decision = parseNaturalLanguageDecision(message);
+  const opinions = getAgentReactions(decision.focus, decision.deprioritize);
+
+  // Insert as unapplied decision (accumulated for week advance)
+  insertDecision({
+    id: nanoid(),
+    week: state.week,
+    raw_input: message,
+    parsed_json: JSON.stringify(decision),
+    result_json: null,
+    applied: 0,
+    created_at: new Date().toISOString(),
+  });
+
+  console.log(`📋 CEO directive noted: ${message}\n`);
+  console.log(`Focus: ${decision.focus.join(', ')}`);
+  if (decision.deprioritize.length > 0) {
+    console.log(`Deprioritize: ${decision.deprioritize.join(', ')}`);
+  }
+  console.log('');
+  console.log(formatAgentDebate(opinions));
+  console.log(`\n🎬 Directives remaining this week: ${state.actions_remaining}/${MAX_ACTIONS_PER_WEEK}`);
+
+  // If AP=0 after this action → auto-advance the week
+  if (state.actions_remaining <= 0) {
+    console.log('\n⏰ All action points spent — advancing to next week...\n');
+    cmdWeekAdvance();
+  }
+}
+
+function cmdSubTick(state: GameState) {
+  const content = generateSubTickContent(state);
+  if (!content) {
+    console.log('[SILENT]');
+    return;
+  }
+
+  console.log(content.output);
+
+  // Apply ephemeral mini-event effects directly
+  if (content.effects) {
+    const updated = { ...state };
+    for (const [key, value] of Object.entries(content.effects)) {
+      if (value === undefined || value === 0) continue;
+      const stateKey = key as keyof GameState;
+      if (typeof (updated as any)[stateKey] === 'number') {
+        (updated as any)[stateKey] += value;
+      }
+    }
+    // Clamp bounded metrics
+    updated.product_quality = Math.max(0, Math.min(100, updated.product_quality));
+    updated.tech_debt = Math.max(0, Math.min(100, updated.tech_debt));
+    updated.security_risk = Math.max(0, Math.min(100, updated.security_risk));
+    updated.community_trust = Math.max(0, Math.min(100, updated.community_trust));
+    updated.open_source_karma = Math.max(0, Math.min(100, updated.open_source_karma));
+    updated.team_morale = Math.max(0, Math.min(100, updated.team_morale));
+    updated.hype = Math.max(0, Math.min(100, updated.hype));
+    updated.investor_interest = Math.max(0, Math.min(100, updated.investor_interest));
+    updated.users = Math.max(0, updated.users);
+    updated.github_stars = Math.max(0, updated.github_stars);
+    updated.mrr = Math.max(0, updated.mrr);
+    updated.weekly_burn = Math.max(500, updated.weekly_burn);
+    updateGameState(updated);
+  }
 }
 
 function cmdTick() {
-  // Called by cron to check if a week should advance
+  // Called by cron every minute
   const state = getGameState();
   if (!state || state.game_over || state.paused) {
     console.log('[SILENT]');
@@ -609,14 +776,20 @@ function cmdTick() {
     return;
   }
 
-  // Advance the week
-  cmdNext('');
+  // Increment sub-tick
+  state.sub_tick += 1;
+  updateGameState({ sub_tick: state.sub_tick } as any);
 
-  // Schedule next tick
-  const interval = state.tick_interval_minutes;
-  if (interval > 0) {
-    const next = new Date(Date.now() + interval * 60 * 1000).toISOString();
-    updateGameState({ next_tick_at: next } as any);
+  // Schedule next tick (always 1 minute intervals)
+  const next = new Date(Date.now() + 1 * 60 * 1000).toISOString();
+  updateGameState({ next_tick_at: next } as any);
+
+  // Check if week should advance
+  if (state.sub_tick >= state.sub_ticks_per_week || state.actions_remaining <= 0) {
+    cmdWeekAdvance();
+  } else {
+    // Generate office activity
+    cmdSubTick(state);
   }
 }
 
@@ -737,8 +910,9 @@ function printHelp() {
 Commands:
   start                  Start a new company
   status                 View company dashboard
-  next [strategy]        Advance one week (with optional strategy)
-  decide <strategy>      Analyze a strategy (agents discuss)
+  reply <message>        Send a CEO directive (costs 1 AP)
+  next [strategy]        Force-advance to next week
+  decide <strategy>      Analyze a strategy (preview only, no AP cost)
   plan                   Get team suggestions for next week
   event [event_id]       Trigger a random or specific event
   choose <eid> <choice>  Make a choice for an event
@@ -749,9 +923,9 @@ Commands:
   hire <role>            Hire a new team member
   fire <name>            Fire a team member
   fundraise              Attempt to raise funding
-  tick                   Check if auto-advance is due (for cron)
+  tick                   Cron sub-tick handler
 
-Or just type your strategy in natural language.`);
+Or just type your message naturally — it's treated as a CEO directive.`);
 }
 
 function formatVal(v: number): string {

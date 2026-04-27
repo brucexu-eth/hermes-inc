@@ -27,7 +27,21 @@ export function closeDb(): void {
 export function initDb(): void {
   const db = getDb();
   db.exec(SCHEMA);
+
+  // Migrate: add columns if missing
+  const cols = db.prepare("PRAGMA table_info(game_state)").all() as { name: string }[];
+  if (!cols.some(c => c.name === 'actions_remaining')) {
+    db.exec('ALTER TABLE game_state ADD COLUMN actions_remaining INTEGER NOT NULL DEFAULT 3');
+  }
+  if (!cols.some(c => c.name === 'sub_tick')) {
+    db.exec('ALTER TABLE game_state ADD COLUMN sub_tick INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!cols.some(c => c.name === 'sub_ticks_per_week')) {
+    db.exec('ALTER TABLE game_state ADD COLUMN sub_ticks_per_week INTEGER NOT NULL DEFAULT 5');
+  }
 }
+
+export const MAX_ACTIONS_PER_WEEK = 3;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS game_state (
@@ -50,6 +64,9 @@ CREATE TABLE IF NOT EXISTS game_state (
   hype REAL NOT NULL DEFAULT 25,
   investor_interest REAL NOT NULL DEFAULT 15,
   a2a_integrations INTEGER NOT NULL DEFAULT 0,
+  actions_remaining INTEGER NOT NULL DEFAULT 3,
+  sub_tick INTEGER NOT NULL DEFAULT 0,
+  sub_ticks_per_week INTEGER NOT NULL DEFAULT 5,
   speed_mode TEXT NOT NULL DEFAULT 'manual',
   tick_interval_minutes INTEGER NOT NULL DEFAULT 0,
   next_tick_at TEXT,
@@ -175,6 +192,16 @@ export function insertDecision(d: Decision): void {
 export function getDecisionsForWeek(week: number): Decision[] {
   const db = getDb();
   return db.prepare('SELECT * FROM decisions WHERE week = ? ORDER BY created_at').all(week) as Decision[];
+}
+
+export function getUnappliedDecisions(week: number): Decision[] {
+  const db = getDb();
+  return db.prepare('SELECT * FROM decisions WHERE week = ? AND applied = 0 ORDER BY created_at').all(week) as Decision[];
+}
+
+export function markDecisionsApplied(week: number): void {
+  const db = getDb();
+  db.prepare('UPDATE decisions SET applied = 1 WHERE week = ? AND applied = 0').run(week);
 }
 
 // Events

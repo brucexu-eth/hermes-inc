@@ -96,7 +96,6 @@ commands = {
     "inc_pause":     f"cd {project_dir} && node dist/cli.js pause",
     "inc_resume":    f"cd {project_dir} && node dist/cli.js resume",
     "inc_fundraise": f"cd {project_dir} && node dist/cli.js fundraise",
-    "inc_chatter":   f"cd {project_dir} && node dist/cli.js chatter",
 }
 
 # Clean up old unprefixed commands if they exist
@@ -120,22 +119,17 @@ PYEOF
 
 echo "  ✅ Quick commands registered"
 
-# 9. Create cron jobs for auto-advance and agent chatter
+# 9. Create cron job for living simulation tick
 echo "⏰ Setting up cron jobs..."
 
 # Remove old cron jobs if they exist (idempotent reinstall)
 hermes cron delete "Hermes Inc Tick" 2>/dev/null || true
 hermes cron delete "Hermes Inc Chatter" 2>/dev/null || true
 
-# Auto-advance: checks every minute if a week tick is due
+# Living simulation tick: every minute, produces office activity or advances the week
 hermes cron create "every 1m" \
-  "Run this command: cd $SCRIPT_DIR && node dist/cli.js tick — If the output contains [SILENT], do nothing and do not reply at all. Otherwise post the full output to the chat." \
+  "Run this command: cd $SCRIPT_DIR && node dist/cli.js tick — If the output contains [SILENT], do nothing and do not reply at all. Otherwise post the full output to the chat, matching the user's language." \
   --name "Hermes Inc Tick" 2>/dev/null && echo "  ✅ Cron: Hermes Inc Tick (every 1m)" || echo "  ⚠️  Could not create tick cron. Create manually."
-
-# Agent chatter: agents may speak up between weeks
-hermes cron create "every 3m" \
-  "Run this command: cd $SCRIPT_DIR && node dist/cli.js chatter — If the output contains [SILENT], do nothing and do not reply at all. Otherwise post the output to the chat as if you are that agent character, matching the user's language." \
-  --name "Hermes Inc Chatter" 2>/dev/null && echo "  ✅ Cron: Hermes Inc Chatter (every 3m)" || echo "  ⚠️  Could not create chatter cron. Create manually."
 
 # 10. Restart gateway if running
 if [ -f "$HERMES_HOME/gateway.pid" ]; then

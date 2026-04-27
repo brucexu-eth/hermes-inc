@@ -18,6 +18,9 @@ export interface GameState {
   hype: number;
   investor_interest: number;
   a2a_integrations: number;
+  actions_remaining: number;
+  sub_tick: number;
+  sub_ticks_per_week: number;
   speed_mode: string;
   tick_interval_minutes: number;
   next_tick_at: string | null;

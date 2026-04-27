@@ -142,6 +142,37 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+export function mergeDecisions(rawInputs: string[]): ParsedDecision {
+  const allFocus: Set<string> = new Set();
+  const allDeprioritize: Set<string> = new Set();
+  const allEffects: Record<string, number> = {};
+
+  for (const raw of rawInputs) {
+    const parsed = parseNaturalLanguageDecision(raw);
+    for (const f of parsed.focus) allFocus.add(f);
+    for (const d of parsed.deprioritize) allDeprioritize.add(d);
+    for (const [key, value] of Object.entries(parsed.effects)) {
+      allEffects[key] = (allEffects[key] || 0) + value;
+    }
+  }
+
+  // Remove deprioritized items from focus
+  for (const d of allDeprioritize) {
+    allFocus.delete(d);
+  }
+
+  // If focus is empty after dedup, default to product
+  if (allFocus.size === 0) {
+    allFocus.add('product');
+  }
+
+  return {
+    focus: Array.from(allFocus),
+    deprioritize: Array.from(allDeprioritize),
+    effects: allEffects,
+  };
+}
+
 export function parseNaturalLanguageDecision(input: string): ParsedDecision {
   const lower = input.toLowerCase();
   const focus: string[] = [];

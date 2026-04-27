@@ -5,7 +5,8 @@ import { calculateValuation } from './calculateValuation.js';
 import { applyDecisionEffects, applyEventEffects } from './applyDecision.js';
 import { checkEndings } from '../data/endings.js';
 import { rollRandomEvent } from '../data/events.js';
-import { getActiveEmployees } from '../db/database.js';
+import { getActiveEmployees, MAX_ACTIONS_PER_WEEK } from '../db/database.js';
+import { detectMilestones, DRAMATIC_EVENT_IDS, eventImagePrompt, endingImagePrompt } from '../data/imagePrompts.js';
 import { nanoid } from 'nanoid';
 
 export interface AdvanceWeekResult {
@@ -15,6 +16,7 @@ export interface AdvanceWeekResult {
   events: GameEvent[];
   eventChanges: Record<string, number>[];
   ending: ReturnType<typeof checkEndings>;
+  imagePrompts: string[];
 }
 
 export function advanceWeek(
@@ -25,6 +27,7 @@ export function advanceWeek(
   const next = structuredClone(state);
 
   next.week += 1;
+  next.actions_remaining = MAX_ACTIONS_PER_WEEK;
 
   // Apply player decision
   let decisionChanges: Record<string, number> = {};
@@ -50,6 +53,7 @@ export function advanceWeek(
   // Roll random events (40% chance per week, or 70% if state is extreme)
   const events: GameEvent[] = [];
   const eventChanges: Record<string, number>[] = [];
+  let template_id: string | null = null;
 
   const eventChance = (
     next.runway_weeks < 5 || next.security_risk > 60 ||
@@ -59,6 +63,7 @@ export function advanceWeek(
   if (Math.random() < eventChance) {
     const template = rollRandomEvent(next);
     if (template) {
+      template_id = template.id;
       const effects: EventEffect = template.choices ? {} : template.effects;
       const gameEvent: GameEvent = {
         id: nanoid(),
@@ -96,6 +101,24 @@ export function advanceWeek(
     next.ending_id = ending.id;
   }
 
+  // Collect image prompts for dramatic moments
+  const imagePrompts: string[] = [];
+
+  // Milestone images (max 1)
+  imagePrompts.push(...detectMilestones(prevState, next));
+
+  // Dramatic event images (only if no milestone already triggered)
+  if (imagePrompts.length === 0 && template_id && DRAMATIC_EVENT_IDS.has(template_id)) {
+    const prompt = eventImagePrompt(template_id, next);
+    if (prompt) imagePrompts.push(prompt);
+  }
+
+  // Ending images
+  if (ending) {
+    const prompt = endingImagePrompt(ending.id, next);
+    if (prompt) imagePrompts.push(prompt);
+  }
+
   return {
     prevState,
     newState: next,
@@ -103,5 +126,6 @@ export function advanceWeek(
     events,
     eventChanges,
     ending,
+    imagePrompts,
   };
 }
